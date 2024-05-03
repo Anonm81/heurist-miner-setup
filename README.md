@@ -34,7 +34,7 @@ Note: Recommended choices in the script are based on vram requirements from LLM_
 4. Enter the EVM address(es) for the miner(s). For multiple GPUs, provide a single address for all GPUs or distinct addresses separated by a comma.
 5. Follow the prompts and provide the required inputs:
     * Press 'Y' to continue with the recommended miner setup or 'N' to choose the setup manually.
-    * If you choose to proceed with the recommended miner setup, you only need to enter EVM addresses and the script will take care of 
+    * If you choose to proceed with the recommended miner setup, you only need to enter EVM addresses & miner selectio id and the script will take care of 
       the rest of the processes.
     * If choosing the setup manually:
         * Select the desired miners to run (LLM + SD, LLM only, or SD only).
