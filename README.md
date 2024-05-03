@@ -28,7 +28,7 @@ Note: Recommended choices in the script are based on vram requirements from LLM_
 * tmux installed (for running miners in separate sessions)
 
 **Usage**
-1. Clone the repository using git clone [https://github.com/Anonm81/heurist-miner-setup] or download the script file.
+1. Clone the repository using git clone https://github.com/Anonm81/heurist-miner-setup or download the script file.
 2. Make the script executable by running chmod +x miner.sh . ( optional )
 3. Run the script using sh setup.sh or using ./setup.sh  (latter format requires step 2 to be executed)
 4. Enter the EVM address(es) for the miner(s). For multiple GPUs, provide a single address for all GPUs or distinct addresses separated by a comma.
