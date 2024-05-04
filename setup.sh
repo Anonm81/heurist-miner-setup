@@ -274,54 +274,22 @@ EOF
     print_horizontal_line
 }
 
-set_man_llm_command()
-{
-            case $manual_llm_choice in
-                1)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '1p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '1p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '1p' | cut -d',' -f1)"
-                    ;;
-                2)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '2p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '2p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '2p' | cut -d',' -f1)"
-                    ;;
-                3)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '3p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '3p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '3p' | cut -d',' -f1)"
-                    ;;
-                4)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '4p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '4p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '4p' | cut -d',' -f1)"
-                    ;;
-                5)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '5p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '5p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '5p' | cut -d',' -f1)"
-                    ;;
-                6)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '6p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '6p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '6p' | cut -d',' -f1)"
-                    ;;
-                7)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '7p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '7p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '7p' | cut -d',' -f1)"
-                    ;;
-                8)
-                    selected_llm_model=$(echo "$llm_models_vrams" | sed -n '8p' | cut -d',' -f1)
-                    selected_llm_vram=$(echo "$llm_models_vrams" | sed -n '8p' | cut -d',' -f2)
-                    manual_llm_miner_cmd="./llm-miner-starter.sh $(echo "$llm_models_vrams" | sed -n '8p' | cut -d',' -f1)"
-                    ;;
-                *)
-                    echo "Invalid choice. Exiting."
-                    exit 1
-                    ;;
-            esac
+set_man_llm_command() {
+    i=1
+    while IFS= read -r model_vram; do
+        if [ "$i" -eq "$manual_llm_choice" ]; then
+            selected_llm_model=$(echo "$model_vram" | cut -d',' -f1)
+            selected_llm_vram=$(echo "$model_vram" | cut -d',' -f2)
+            manual_llm_miner_cmd="./llm-miner-starter.sh $selected_llm_model"
+            return
+        fi
+        i=$((i + 1))
+    done <<EOF
+$llm_models_vrams
+EOF
+
+    echo "Invalid choice. Exiting."
+    exit 1
 }
 
 miner_setup_choice(){
@@ -358,12 +326,18 @@ EOF
             ;;
     esac
     echo "\n${GREEN}The following commands will be executed:\n"
-    echo "LLM Miner Command: $rec_llm_miner_cmd"
-    echo "SD Miner Command will be updated in subsequent steps\n"
-    if [ "$num_gpus" -gt 1 ]; then
-        echo "Updating num_child_process to 20, concurrency_soft_limit to 30, NUM_CUDA_DEVICES to $num_gpus"
+    if [ "$rec_user_choice" = "1" ] || [ "$rec_user_choice" = "2" ]; then
+        echo "LLM Miner Command: $rec_llm_miner_cmd"
+        if [ "$rec_user_choice" = "1" ]; then
+            echo "SD Miner Command will be updated in subsequent steps\n"
+        fi
+        if [ "$num_gpus" -gt 1 ]; then
+            echo "Updating num_child_process to 20, concurrency_soft_limit to 30, NUM_CUDA_DEVICES to $num_gpus"
+        else
+            echo "Updating num_child_process to 20 and concurrency_soft_limit to 30"
+        fi
     else
-        echo "Updating num_child_process to 20 and concurrency_soft_limit to 30"
+        echo "Running $(printf "%.0f" "$((gpu_vram / 6))") instances of Stable diffusion miner incl SDXL"
     fi
     sleep 5
     echo "${NC}"
@@ -442,7 +416,7 @@ EOF
             #set manual llm command values
             set_man_llm_command
 
-            echo "\nThe following commands will be executed:"
+            echo "\n${GREEN}The following commands will be executed:\n${NC}"
             echo "LLM Miner Command: $manual_llm_miner_cmd"
             echo "SD Miner Command will be updated in subsequent steps $manual_sd_miner_cmd"
             ;;
@@ -476,7 +450,7 @@ EOF
             #set manual llm command values
             set_man_llm_command 
 
-            echo "The following command will be executed:"
+            echo "${GREEN}The following command will be executed:\n${NC}"
             echo "LLM Miner Command: $manual_llm_miner_cmd"
             ;;
 
@@ -530,8 +504,8 @@ EOF
                 done
             fi
             
-        echo "The following command will be executed:"
-        echo "SD Miner Command: $manual_sd_miner_cmd";;
+        echo "${GREEN}The following command will be executed:\n${NC}"
+        echo "SD Miner Command will be updated in subsequent steps: $manual_sd_miner_cmd";;
 
         *)
         echo "Invalid choice. Exiting."
@@ -549,7 +523,10 @@ prompt_evm_addresses() {
     echo "${NC}"
     echo "${BLUE}"
     echo "${NC}"
-        generate_ascii_art
+
+    #Generate Heurist art
+    generate_ascii_art
+
         printf "${BLUE}\\nDetected %s with %d GPUs.\\n${NC}" "$gpu_model" "$num_gpus"
         printf "${BLUE}Your System Configuration is:\\n${NC}"
         print_gpu_table "$gpu_model" "$num_gpus" "$vram_info"
@@ -953,9 +930,11 @@ if ! grep -q "alias monitor='tmux attach-session -t miner_monitor'" ~/.bashrc; t
     echo "alias monitor='tmux attach-session -t miner_monitor'" >> ~/.bashrc
 
 fi
+
 }
 
-#Call functions
+#Call Functions
+
 detect_gpus
 extract_models
 prompt_evm_addresses
