@@ -488,7 +488,7 @@ EOF
             if [ "$manual_miner_choice" = "3" ]; then
                 while true; do
                     rec_num_sd_miners=$(printf "%.0f" "$((gpu_vram/ 6))")
-                    echo "\n$rec_num_sd_miners SD Miners"
+                   # echo "\n$rec_num_sd_miners SD Miners"
                     
                     printf "${ITALICS}${GREEN}\\nBased on available %d Mib VRAM/GPU you can run upto $rec_num_sd_miners SD miners ( Incl SDXL ) on each GPU. Enter the number of SD miners per GPU (default is 1): ${NC}" "$vram_per_gpu" 
                     
