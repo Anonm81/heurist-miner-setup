@@ -100,7 +100,7 @@ def calculate_sd_metrics(log_file, model_type, gpu_id):
     except PermissionError:
         return None
 
-    total_requests = log_content.count('Request ID')
+    total_requests = len(re.findall(r'Request ID .* completed', log_content))
     completion_times = [float(x) for x in re.findall(r'completed\. Total time: (\d+\.\d+)', log_content)]
     
     loading_time_pattern = re.compile(r'Loading.*?(\d+\.\d+|\d+)')
