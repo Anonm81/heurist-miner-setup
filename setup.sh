@@ -1,8 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 total_vram=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | awk '{sum += $1} END {print sum}')
 num_gpus=$(nvidia-smi --list-gpus | wc -l)
 gpu_model=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1)
+export start_time=$(date +%s)
+WD=$(pwd)
+
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -666,32 +669,28 @@ fi
 
 echo "${GREEN}✓ Packages Updated → Creating New Conda Environment${NC}"
 
-#Skip creating Conda if folder already exists
-if [ ! -d "miner-release" ];  then 
 conda create --name gpu-3-11 python=3.11 -y
 echo "${GREEN}\n✓ New Conda Environment Created → Initializing Conda\n${NC}"
 
 eval "$(conda shell.posix hook)"
 echo "${GREEN}\n✓ Conda Initialized → Activating Conda Environment\n${NC}"
-else 
-    eval "$(conda shell.bash hook)"
-    echo "${GREEN}Conda environment already exists, skipping\n${NC}"
-fi
+
 
 conda activate /opt/conda/envs/gpu-3-11
 echo "${GREEN}\n✓ Conda Environment Activated → Cloning Miner-Release Repository\n${NC}"
 
-if [ ! -d "miner-release" ];  then 
-   git clone https://github.com/heurist-network/miner-release
-   echo "${GREEN}\n✓ Miner-Release Repository Cloned → Changing Directory\n${NC}"
-    
+if [ -z "$restart_choice" ] || [ "$restart_choice" = "3" ]; then
+        # Clone only if it's a fresh run or cache was deleted
+        git clone https://github.com/heurist-network/miner-release
+        echo "${GREEN}\n✓ Miner-Release Repository Cloned → Changing Directory\n${NC}"
+ elif
+         [ "$restart_choice" = "2" ]; then
+         echo "${GREEN}\n✓ Skipping Heurist Repository Cloning as miner-release already exists → Changing Directory\n${NC}"
+fi
+
 cd miner-release/
 echo "${GREEN}\n✓ Directory Changed to Miner-Release → Creating .env File\n${NC}"
 
-else
-    cd miner-release/
-    echo "${YELLOW}\n! Miner-Release Repository already exists. Changing Directory.\n${NC}"
-fi
 
 #Find location of config.toml
 CONFIG_FILE=$(find / -type f -name "config.toml" -path "*/miner-release/*" -print -quit 2>/dev/null)
@@ -705,11 +704,9 @@ SD_MINER="$(basename $(find / -type f -name 'sd-miner*.py' -path "*/miner-releas
 #Updating SD miner commands
 update_sd_miner_cmd 
 
-
-if [ -f ".env" ]; then
-    rm ".env"
-    echo "${GREEN}\n✗ .env File Removed \n${NC}"  
-fi
+if [ "$restart_choice" = "2" ]; then
+rm -rf .env 
+fi 
 
 touch .env
 echo "${GREEN}\n✓ .env File Created → Opening .env File for Editing\n${NC}"
@@ -767,7 +764,7 @@ echo "${GREEN}\nInstalling Packages required for LLM Miner\n${NC}"
 echo "${GREEN}\n✓ jq Installed → Installing bc\n${NC}"
  apt install -y bc
 
-#echo "${GREEN}\n✓ bc Installed → Updating Packages\n${NC}"
+echo "${GREEN}\n✓ bc Installed → Updating Packages\n${NC}"
 
  apt update -y &&  apt upgrade -y &&  apt install -y software-properties-common &&  add-apt-repository ppa:deadsnakes/ppa << EOF
 
@@ -776,13 +773,14 @@ EOF
 echo "${GREEN}\n✓ Dependencies Installed for LLM Miner\n${NC}"
 
 #Remove logs for restartability 
-rm -rf llm-miner_*log 2>/dev/null
-rm -rf sd-miner_0_*log 2>/dev/null
+#rm -rf llm-miner_*log 2>/dev/null
+#rm -rf sd-miner_0_*log 2>/dev/null
 
 
 }
 
 run_miners() {
+
     tmux new-session -d -s miner_monitor
 
     if [ "$user_choice" = "n" ] || [ "$user_choice" = "N" ]; then
@@ -800,7 +798,7 @@ run_miners() {
                 prev_gpu_uuid=$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader | awk -F', ' -v idx="$((i-1))" '$1 == idx {print substr($2, 5, 6)}')
                 prev_miner_id=$(eval echo "\$address_$((i-1))")
                 prev_log_file="llm-miner_${prev_miner_id}-${prev_gpu_uuid}.log"
-                tmux send-keys -t miner_monitor.$((i)) "while true; do if [ -f \"$prev_log_file\" ]; then if grep -q '.*LLM miner started.*' \"$prev_log_file\"; then break; else sleep 1; fi; else sleep 1; fi; done" C-m
+                tmux send-keys -t miner_monitor.$((i)) "while true; do if [ -f \"$prev_log_file\" ]; then last_line=\$(grep -a \"LLM miner started\" \"$prev_log_file\" | tail -1); if [ -n \"\$last_line\" ]; then timestamp=\$(echo \"\$last_line\" | awk '{print \$1 \" \" \$2}'); if [ \"\$(date -d \"\$timestamp\" +%s)\" -ge \"\$start_time\" ]; then break; else sleep 1; fi; else sleep 1; fi; else sleep 1; fi; done" C-m
                 tmux send-keys -t miner_monitor.$((i)) "clear;echo 'Waiting for LLM to start in GPU $((i-1))...'" C-m
                 tmux send-keys -t miner_monitor.$((i)) "echo 'LLM started in GPU $((i-1)). Starting LLM in GPU $i...'" C-m
                 tmux send-keys -t miner_monitor.$((i)) "$manual_llm_miner_cmd --miner-id-index $i --port 800$i --gpu-ids $i" C-m
@@ -820,7 +818,7 @@ run_miners() {
                     miner_id=$(eval echo "\$address_$((last_pane_index-1))")
                 fi
                 log_file="llm-miner_${miner_id}-${gpu_uuid}.log"
-                tmux send-keys -t miner_monitor.$((last_pane_index)) "while true; do if [ -f \"$log_file\" ]; then if grep -q '.*LLM miner started.*' \"$log_file\"; then break; else sleep 1; fi; else sleep 1; fi; done" C-m
+                tmux send-keys -t miner_monitor.$((last_pane_index)) "while true; do if [ -f \"$log_file\" ]; then last_line=\$(grep -a \"LLM miner started\" \"$log_file\" | tail -1); if [ -n \"\$last_line\" ]; then timestamp=\$(echo \"\$last_line\" | awk '{print \$1 \" \" \$2}'); if [ \"\$(date -d \"\$timestamp\" +%s)\" -ge \"\$start_time\" ]; then break; else sleep 1; fi; else sleep 1; fi; else sleep 1; fi; done" C-m
                 tmux send-keys -t miner_monitor.$((last_pane_index)) "clear;echo 'Waiting for LLM to start in GPU $((last_pane_index-1))...'" C-m
                 tmux send-keys -t miner_monitor.$((last_pane_index)) "echo 'LLM started in GPU $((last_pane_index-1)). Starting SD Miner...'" C-m
                 tmux send-keys -t miner_monitor.$((last_pane_index)) "$CONDA_ACTIVATE" C-m
@@ -838,7 +836,8 @@ run_miners() {
                 tmux split-window -v -t miner_monitor
                 tmux select-layout -t miner_monitor tiled
 
-                tmux send-keys -t miner_monitor.$((i-1)) "while true; do if [ -f \"$log_file\" ]; then if grep -q '.*Default model .* loaded successfully.*' \"$log_file\"; then break; else sleep 1; fi; else sleep 1; fi; done" C-m
+                tmux send-keys -t miner_monitor.$((i-1)) "while true; do if [ -f \"$log_file\" ]; then last_line=\$(grep -a \"Default model .* loaded successfully\" \"$log_file\" | tail -1); if [ -n \"\$last_line\" ]; then timestamp=\$(echo \"\$last_line\" | awk '{print \$1 \" \" \$2}'); if [ \"\$(date -d \"\$timestamp\" +%s)\" -ge \"\$start_time\" ]; then break; else sleep 1; fi; else sleep 1; fi; else sleep 1; fi; done" C-m
+                tmux send-keys -t miner_monitor.$((i-1)) "echo \"Last line that caused exit: \$last_line\"" C-m
                 tmux send-keys -t miner_monitor.$((i-1)) "clear;echo 'Waiting for SD Miner to start in GPU 0...'" C-m
                 tmux send-keys -t miner_monitor.$((i-1)) "echo 'SD Miner started in GPU 0. To avoid resource contention starting SD Miner $i in 20 seconds...'" C-m
                 tmux send-keys -t miner_monitor.$((i-1)) "sleep 20" C-m
@@ -861,7 +860,7 @@ run_miners() {
                     prev_gpu_uuid=$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader | awk -F', ' -v idx="$((i-1))" '$1 == idx {print substr($2, 5, 6)}')
                     prev_miner_id=$(eval echo "\$address_$((i-1))")
                     prev_log_file="llm-miner_${prev_miner_id}-${prev_gpu_uuid}.log"
-                    tmux send-keys -t miner_monitor.$((i)) "while true; do if [ -f \"$prev_log_file\" ]; then if grep -q '.*LLM miner started.*' \"$prev_log_file\"; then break; else sleep 1; fi; else sleep 1; fi; done" C-m
+                    tmux send-keys -t miner_monitor.$((i)) "while true; do if [ -f \"$prev_log_file\" ]; then last_line=\$(grep -a \"LLM miner started\" \"$prev_log_file\" | tail -1); if [ -n \"\$last_line\" ]; then timestamp=\$(echo \"\$last_line\" | awk '{print \$1 \" \" \$2}'); if [ \"\$(date -d \"\$timestamp\" +%s)\" -ge \"\$start_time\" ]; then break; else sleep 1; fi; else sleep 1; fi; else sleep 1; fi; done" C-m
                     tmux send-keys -t miner_monitor.$((i)) "clear;echo 'Waiting for LLM to start in GPU $((i-1))...'" C-m
                     tmux send-keys -t miner_monitor.$((i)) "echo 'LLM started in GPU $((i-1)). Starting LLM in GPU $i...'" C-m
                     tmux send-keys -t miner_monitor.$((i)) "$rec_llm_miner_cmd --miner-id-index $i --port 800$i --gpu-ids $i" C-m
@@ -881,7 +880,8 @@ run_miners() {
                     miner_id=$(eval echo "\$address_$((last_pane_index-1))")
                 fi
                 log_file="llm-miner_${miner_id}-${gpu_uuid}.log"
-                tmux send-keys -t miner_monitor.$((last_pane_index)) "while true; do if [ -f \"$log_file\" ]; then if grep -q '.*LLM miner started.*' \"$log_file\"; then break; else sleep 1; fi; else sleep 1; fi; done" C-m
+                
+                tmux send-keys -t miner_monitor.$((last_pane_index)) "while true; do if [ -f \"$log_file\" ]; then last_line=\$(grep -a \"LLM miner started\" \"$log_file\" | tail -1); if [ -n \"\$last_line\" ]; then timestamp=\$(echo \"\$last_line\" | awk '{print \$1 \" \" \$2}'); if [ \"\$(date -d \"\$timestamp\" +%s)\" -ge \"\$start_time\" ]; then break; else sleep 1; fi; else sleep 1; fi; else sleep 1; fi; done" C-m
                 tmux send-keys -t miner_monitor.$((last_pane_index)) "clear;echo 'Waiting for LLM to start in GPU $((last_pane_index-1))...'" C-m
                 tmux send-keys -t miner_monitor.$((last_pane_index)) "echo 'LLM started in GPU $((last_pane_index-1)). Starting SD Miner...'" C-m
                 tmux send-keys -t miner_monitor.$((last_pane_index)) "$CONDA_ACTIVATE" C-m
@@ -900,7 +900,7 @@ run_miners() {
                 miner_id_0="${address_0}"
                 log_file="sd-miner_0_${miner_id_0}-${gpu_uuid}.log"
 
-                tmux send-keys -t miner_monitor.$((i-1)) "while true; do if [ -f \"$log_file\" ]; then if grep -q '.*Default model .* loaded successfully.*' \"$log_file\"; then break; else sleep 1; fi; else sleep 1; fi; done" C-m
+                tmux send-keys -t miner_monitor.$((i-1)) "while true; do if [ -f \"$log_file\" ]; then last_line=\$(grep -a \"Default model .* loaded successfully\" \"$log_file\" | tail -1); if [ -n \"\$last_line\" ]; then timestamp=\$(echo \"\$last_line\" | awk '{print \$1 \" \" \$2}'); if [ \"\$(date -d \"\$timestamp\" +%s)\" -ge \"\$start_time\" ]; then break; else sleep 1; fi; else sleep 1; fi; else sleep 1; fi; done" C-m
                 tmux send-keys -t miner_monitor.$((i-1)) "clear;echo 'Waiting for SD Miner to start in GPU 0...'" C-m
                 tmux send-keys -t miner_monitor.$((i-1)) "echo 'SD Miner started in GPU 0. To avoid resource contention starting SD Miner $i in 20 seconds...'" C-m
                 tmux send-keys -t miner_monitor.$((i-1)) "sleep 20" C-m
@@ -914,6 +914,47 @@ run_miners() {
 tmux attach-session -t miner_monitor
 }
 
+save_user_choices() {
+    echo "user_choice=$user_choice" > "$CHOICES_FILE_PATH"
+    echo "num_gpus=$num_gpus" >> "$CHOICES_FILE_PATH"
+    echo "address_0=$address_0" >> "$CHOICES_FILE_PATH"
+    echo "CONDA_ACTIVATE=$CONDA_ACTIVATE" >> "$CHOICES_FILE_PATH"
+    echo "start_time=$start_time" >> "$CHOICES_FILE_PATH"
+    echo "WD='$WD'" >> "$CHOICES_FILE_PATH"
+    echo "SD_MINER='$SD_MINER'" >> "$CHOICES_FILE_PATH"
+    echo "evm_address=$evm_address">> "$CHOICES_FILE_PATH"
+    if [ "$num_gpus" -gt 1 ]; then
+        for i in $(seq 1 $((num_gpus - 1))); do
+            echo "address_$i='$(eval echo "\$address_$i")'" >> "$CHOICES_FILE_PATH"
+        done
+    fi
+
+ # Conditional section based on user choice
+    if [ "$user_choice" = "n" ] || [ "$user_choice" = "N" ]; then
+        [ -n "$manual_miner_choice" ] && echo "manual_miner_choice=$manual_miner_choice" >> "$CHOICES_FILE_PATH"
+        [ -n "$manual_llm_choice" ] && echo "manual_llm_choice=$manual_llm_choice" >> "$CHOICES_FILE_PATH"
+        [ -n "$manual_sd_choice" ] && echo "manual_sd_choice=$manual_sd_choice" >> "$CHOICES_FILE_PATH"
+        [ -n "$num_child_process" ] && echo "num_child_process=$num_child_process" >> "$CHOICES_FILE_PATH"
+        [ -n "$num_sd_miners" ] && echo "num_sd_miners=$num_sd_miners" >> "$CHOICES_FILE_PATH"
+        [ -n "$manual_llm_miner_cmd" ] && echo "manual_llm_miner_cmd=\"$manual_llm_miner_cmd\"" >> "$CHOICES_FILE_PATH"
+        [ -n "$manual_sd_miner_cmd" ] && echo "manual_sd_miner_cmd=\"$manual_sd_miner_cmd\"" >> "$CHOICES_FILE_PATH"
+    else
+        [ -n "$rec_user_choice" ] && echo "rec_user_choice=$rec_user_choice" >> "$CHOICES_FILE_PATH"
+        [ -n "$rec_llm_miner_cmd" ] && echo "rec_llm_miner_cmd=\"$rec_llm_miner_cmd\"" >> "$CHOICES_FILE_PATH"
+        [ -n "$rec_sd_miner_cmd" ] && echo "rec_sd_miner_cmd=\"$rec_sd_miner_cmd\"" >> "$CHOICES_FILE_PATH"
+        [ -n "$rec_num_sd_miners" ] && echo "rec_num_sd_miners=$rec_num_sd_miners" >> "$CHOICES_FILE_PATH"
+    fi
+    
+    echo "gpu_vram=$gpu_vram" >> "$CHOICES_FILE_PATH"
+}
+
+set_path() {
+    if [ "$WD" = "/" ]; then
+        CHOICES_FILE_PATH="${WD}user_choices.txt"  # Directly append to avoid double slash
+    else
+        CHOICES_FILE_PATH="${WD}/user_choices.txt"
+    fi
+}
 
 update_tmux_bashrc_conf() {
 if [ -f ~/.tmux.conf ]; then
@@ -933,15 +974,96 @@ fi
 
 }
 
+main(){
+        export start_time=$(date +%s)
+        detect_gpus
+        extract_models
+        prompt_evm_addresses
+        recommend_models
+        miner_setup_choice
+        prompt_config
+        install_stable_diffusion_packages
+        install_llm_packages
+        update_tmux_bashrc_conf
+        save_user_choices
+        run_miners 
+}
+
+delete_cache_folders() {
+        tmux kill-session -t miner_monitor
+        rm -rf ~/.cache/huggingface/ 
+        rm -rf ~/.cache/heurist/
+        rm -rf "miner-release"
+        rm -rf "$CHOICES_FILE_PATH"
+}
+
+restart_miners() {
+        export start_time=$(date +%s)
+        if tmux has-session -t miner_monitor 2>/dev/null; then
+            tmux kill-session -t miner_monitor
+            echo "${GREEN}TMUX Session 'miner_monitor' terminated${NC}"
+        else
+            echo "${GREEN}miner_monitor does not exist,skipping TMUX termination${NC}"
+        fi
+        echo "TMUX Session exited, Sleep for 20 seconds to wait for resource unlocks..."
+        #sleep 20
+        save_user_choices
+        echo "User choices updated"
+        eval "$(conda shell.posix hook)"
+        conda activate /opt/conda/envs/gpu-3-11
+        echo "Conda environment activated"
+        cd miner-release/
+        echo "Navigating to miner-release"
+        run_miners
+}
 #Call Functions
 
-detect_gpus
-extract_models
-prompt_evm_addresses
-recommend_models
-miner_setup_choice
-prompt_config
-install_stable_diffusion_packages
-install_llm_packages
-update_tmux_bashrc_conf
-run_miners
+set_path
+
+if [ -f "$CHOICES_FILE_PATH" ]; then
+    # Load values
+    execution_mode='Restart'
+    . "$CHOICES_FILE_PATH"
+    echo "\n${YELLOW}!Existing Mining setup detected: ${NC}"
+    
+    if [ "$user_choice" = "n" ] || [ "$user_choice" = "N" ]; then
+        echo "\n${GREEN}Previous manual mining setup choice:\n${BLUE}"
+        [ -n "$manual_miner_choice" ] && echo "Miner Choice: $manual_miner_choice"
+        [ -n "$manual_llm_choice" ] && echo "LLM Choice: $manual_llm_choice"
+        [ -n "$manual_sd_choice" ] && echo "SD Choice: $manual_sd_choice"
+        [ -n "$num_sd_miners" ] && echo "Number of SD Miners: $num_sd_miners"
+        [ -n "$manual_llm_miner_cmd" ] && echo "LLM Miner Command: $manual_llm_miner_cmd"
+        [ -n "$manual_sd_miner_cmd" ] && echo "SD Miner Command: $manual_sd_miner_cmd"
+    else
+        echo "\n${GREEN}Previous recommended mining setup choice:\n${BLUE}"
+        [ -n "$rec_user_choice" ] && echo "User Choice: $rec_user_choice"
+        [ -n "$rec_llm_miner_cmd" ] && echo "LLM Miner Command: $rec_llm_miner_cmd"
+        [ -n "$rec_sd_miner_cmd" ] && echo "SD Miner Command: $rec_sd_miner_cmd"
+        [ -n "$rec_num_sd_miners" ] && echo "Number of SD Miners: $rec_num_sd_miners"
+    fi
+
+    echo -n "\n${GREEN}Press 1 to continue with the same setup, Press 2 to reconfigure mining setup, Press 3 to delete cache and reinstall: ${NC}"
+    read restart_choice
+    
+    if [ "$restart_choice" = "1" ]; then
+        echo "\n${GREEN}Proceeding to restart the above miner setup:${NC}"
+        restart_miners
+    elif [ "$restart_choice" = "2" ]; then
+        if tmux has-session -t miner_monitor 2>/dev/null; then
+            tmux kill-session -t miner_monitor
+            echo "${GREEN}TMUX Session 'miner_monitor' terminated${NC}"
+        else
+            echo "${GREEN}miner_monitor does not exist,skipping TMUX termination${NC}"
+        fi
+        main 
+    elif [ "$restart_choice" = "3" ]; then
+        echo "\n${GREEN}Deleting Cache, Proceeding to Reconfigure...${NC}"
+        delete_cache_folders
+        main 
+    else
+        echo "Invalid choice. Exiting."
+        exit 1
+    fi
+else 
+    main 
+fi
