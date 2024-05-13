@@ -184,9 +184,9 @@ recommend_models() {
         vram=$(echo "$model_vram" | cut -d',' -f2)
         if awk -v vram="$gpu_vram" -v needed="$vram" 'BEGIN {exit !(vram >= needed)}'; then
             case "$model" in
-                "openhermes-2.5-mistral-7b-gptq")
-                    llama_multipliers="$llama_multipliers 1"
-                    ;;
+                #"openhermes-2.5-mistral-7b-gptq")
+                #    llama_multipliers="$llama_multipliers 1"
+                #    ;;
                 "openhermes-2-pro-mistral-7b")
                     llama_multipliers="$llama_multipliers 2"
                     ;;
@@ -586,21 +586,49 @@ prompt_evm_addresses() {
 }
 
 create_authentication_wallet() {
-  echo "${GREEN}Please wait for Identity wallet verification\n\nInstalling Packages required for Wallet Binding generator\n${NC}"
-  pip install -q web3 mnemonic python-dotenv prettytable toml > /dev/null 2>&1
-  if [ -z "$restart_choice" ] || [ "$restart_choice" = "3" ]; then
-        # Clone only if it's a fresh run or cache was deleted
-        git clone https://github.com/heurist-network/miner-release > /dev/null 2>&1
-        if [ $? -ne 0 ]; then
-            echo "An error occurred while trying to clone the repository."
+  # Read the .env file and check for missing files
+  missing_files=false
+  while IFS='=' read -r key value; do
+    # Using a POSIX-compliant method to check pattern matching
+    case "$key" in
+      MINER_ID_[0-9]*)
+        # Convert value to lowercase for POSIX shells (using tr instead of ,, operator)
+        file_path="/root/.heurist-keys/$(echo "$value" | tr '[:upper:]' '[:lower:]').txt"
+        if [ ! -f "$file_path" ]; then
+          missing_files=true
+          break
         fi
-        echo "${GREEN}\n✓ Miner-Release Repository Cloned \n${NC}"
- elif
-         [ "$restart_choice" = "2" ]; then
-         echo "${GREEN}\n✓ Skipping Heurist Repository Cloning as miner-release already exists\n${NC}"
-fi
+        ;;
+    esac
+  done < miner-release/.env
 
-echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
+  # Only run the rest of the function if a file is missing
+  if [ "$missing_files" = "true" ]; then
+    echo "${GREEN}\nKey files not found → Proceeding to Install Packages required for Identity Wallet Binding generator\n${NC}"
+    pip install -q web3 mnemonic python-dotenv prettytable toml > /dev/null 2>&1
+   
+    mkdir -p /root/.heurist-keys
+    echo "${GREEN}Running generator.py for Identity Wallet verification/bonding\n${NC}"
+    printf "${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
+    printf "${BLUE}%*s${NC}\n\n" $(tput cols) | tr ' ' '*'
+    printf "${YELLOW}"
+    python3 miner-release/auth/generator.py 
+    printf "${NC}"
+    printf "\n${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
+    printf "${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
+  else
+    echo "${GREEN}✓ All required key files are present. Skipping wallet binding.${NC}"
+  fi
+}
+
+
+
+clone_repository() {
+     # Clone only if it's a fresh run or cache was deleted
+     [ ! -d "miner-release" ] && git clone https://github.com/heurist-network/miner-release > /dev/null 2>&1
+     echo "${GREEN}\n✓ Miner-Release Repository Cloned → Creating .env File for storing Miner ID's \n${NC}"
+
+#echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
 touch miner-release/.env
 
 if [ "$num_gpus" -gt 1 ]; then
@@ -635,14 +663,7 @@ while IFS='=' read -r key value; do
         # Add more cases for additional miner IDs if needed
     esac
 done < "miner-release/.env"
-
-  mkdir -p /root/.heurist-keys
-  echo "${GREEN}.env file created → Running generator for Identity Wallet verification/bonding\n${NC}"
-  printf "${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
-  printf "${BLUE}%*s${NC}\n\n" $(tput cols) | tr ' ' '*'
-  python3 miner-release/auth/generator.py
-  printf "\n${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
-  printf "${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
+echo "${GREEN}\n✓ .env file updated → Proceeding to check for Key files \n${NC}"
 }
 
 prompt_config() {
@@ -995,6 +1016,7 @@ main(){
         detect_gpus
         extract_models
         prompt_evm_addresses
+        clone_repository
         create_authentication_wallet
         recommend_models
         miner_setup_choice
