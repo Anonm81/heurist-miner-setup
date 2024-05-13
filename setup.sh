@@ -604,11 +604,11 @@ create_authentication_wallet() {
 
   # Only run the rest of the function if a file is missing
   if [ "$missing_files" = "true" ]; then
-    echo "${GREEN}\nKey files not found → Proceeding to Install Packages required for Identity Wallet Binding generator\n${NC}"
+    echo "${GREEN}\nKey files not found → Proceeding to Install Packages required for Identity Wallet Binding verification\n${NC}"
     pip install -q web3 mnemonic python-dotenv prettytable toml > /dev/null 2>&1
    
     mkdir -p /root/.heurist-keys
-    echo "${GREEN}Running generator.py for Identity Wallet verification/bonding\n${NC}"
+    echo "${GREEN}Packages Installed → Running generator.py for Identity Wallet verification/bonding\n${NC}"
     printf "${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
     printf "${BLUE}%*s${NC}\n\n" $(tput cols) | tr ' ' '*'
     printf "${YELLOW}"
