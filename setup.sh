@@ -5,7 +5,8 @@ num_gpus=$(nvidia-smi --list-gpus | wc -l)
 gpu_model=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1)
 export start_time=$(date +%s)
 WD=$(pwd)
-
+evm_addresses=""
+evm_address=""
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -584,6 +585,66 @@ prompt_evm_addresses() {
     fi
 }
 
+create_authentication_wallet() {
+  echo "${GREEN}Please wait for Identity wallet verification\n\nInstalling Packages required for Wallet Binding generator\n${NC}"
+  pip install -q web3 mnemonic python-dotenv prettytable toml > /dev/null 2>&1
+  if [ -z "$restart_choice" ] || [ "$restart_choice" = "3" ]; then
+        # Clone only if it's a fresh run or cache was deleted
+        git clone https://github.com/heurist-network/miner-release > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            echo "An error occurred while trying to clone the repository."
+        fi
+        echo "${GREEN}\n✓ Miner-Release Repository Cloned \n${NC}"
+ elif
+         [ "$restart_choice" = "2" ]; then
+         echo "${GREEN}\n✓ Skipping Heurist Repository Cloning as miner-release already exists\n${NC}"
+fi
+
+echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
+touch miner-release/.env
+
+if [ "$num_gpus" -gt 1 ]; then
+    case "$evm_addresses" in
+        *,*)
+            set -- $(echo "$evm_addresses" | tr ',' ' ')
+            i=0
+            for address; do
+                echo "MINER_ID_$i=$address" >> miner-release/.env
+                i=$((i + 1))
+            done
+            ;;
+        *)
+            i=0
+            while [ "$i" -lt "$num_gpus" ]; do
+                echo "MINER_ID_$i=$evm_addresses" >> miner-release/.env
+              i=$((i + 1))
+            done
+            ;;
+    esac
+else
+    echo "MINER_ID_0=$evm_address" >> miner-release/.env
+fi
+
+
+    # Read miner IDs from .env file
+while IFS='=' read -r key value; do
+    case "$key" in
+        "MINER_ID_0")
+            address_0="$value"
+            ;;
+        # Add more cases for additional miner IDs if needed
+    esac
+done < "miner-release/.env"
+
+  mkdir -p /root/.heurist-keys
+  echo "${GREEN}.env file created → Running generator for Identity Wallet verification/bonding\n${NC}"
+  printf "${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
+  printf "${BLUE}%*s${NC}\n\n" $(tput cols) | tr ' ' '*'
+  python3 miner-release/auth/generator.py
+  printf "\n${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
+  printf "${BLUE}%*s${NC}\n" $(tput cols) | tr ' ' '*'
+}
+
 prompt_config() {
 if [ "$user_choice" = "n" ] || [ "$user_choice" = "N" ]; then
     if [ "$manual_miner_choice" = "1" ] || [ "$manual_miner_choice" = "2" ]; then
@@ -677,28 +738,20 @@ echo "${GREEN}\n✓ Conda Initialized → Activating Conda Environment\n${NC}"
 
 
 conda activate /opt/conda/envs/gpu-3-11
-echo "${GREEN}\n✓ Conda Environment Activated → Cloning Miner-Release Repository\n${NC}"
+echo "${GREEN}\n✓ Conda Environment Activated → Navigating to miner-release\n${NC}"
 
-if [ -z "$restart_choice" ] || [ "$restart_choice" = "3" ]; then
-        # Clone only if it's a fresh run or cache was deleted
-        git clone https://github.com/heurist-network/miner-release
-        echo "${GREEN}\n✓ Miner-Release Repository Cloned → Changing Directory\n${NC}"
- elif
-         [ "$restart_choice" = "2" ]; then
-         echo "${GREEN}\n✓ Skipping Heurist Repository Cloning as miner-release already exists → Changing Directory\n${NC}"
-fi
 
 cd miner-release/
 echo "${GREEN}\n✓ Directory Changed to Miner-Release → Creating .env File\n${NC}"
 
 
 #Find location of config.toml
-CONFIG_FILE=$(find / -type f -name "config.toml" -path "*/miner-release/*" -print -quit 2>/dev/null)
+CONFIG_FILE=$(find . -type f -name "config.toml"  -print -quit 2>/dev/null)
 
 pip install python-dotenv
    
 #Find .py file for exectuting SD Miner
-SD_MINER="$(basename $(find / -type f -name 'sd-miner*.py' -path "*/miner-release/*" -print -quit 2>/dev/null))"
+SD_MINER="$(basename $(find . -type f -name 'sd-miner*.py'  -print -quit 2>/dev/null))"
 
 
 #Updating SD miner commands
@@ -707,43 +760,6 @@ update_sd_miner_cmd
 if [ "$restart_choice" = "2" ]; then
 rm -rf .env 
 fi 
-
-touch .env
-echo "${GREEN}\n✓ .env File Created → Opening .env File for Editing\n${NC}"
-
-
-if [ "$num_gpus" -gt 1 ]; then
-    case "$evm_addresses" in
-        *,*)
-            set -- $(echo "$evm_addresses" | tr ',' ' ')
-            i=0
-            for address; do
-                echo "MINER_ID_$i=$address" >> .env
-                i=$((i + 1))
-            done
-            ;;
-        *)
-            i=0
-            while [ "$i" -lt "$num_gpus" ]; do
-                echo "MINER_ID_$i=$evm_addresses" >> .env
-              i=$((i + 1))
-            done
-            ;;
-    esac
-else
-    echo "MINER_ID_0=$evm_address" >> .env
-fi
-
-
-    # Read miner IDs from .env file
-while IFS='=' read -r key value; do
-    case "$key" in
-        "MINER_ID_0")
-            address_0="$value"
-            ;;
-        # Add more cases for additional miner IDs if needed
-    esac
-done < ".env"
 
 echo "${GREEN}\n✓ .env File Updated with EVM_Address → Installing Requirements\n${NC}"
 
@@ -979,6 +995,7 @@ main(){
         detect_gpus
         extract_models
         prompt_evm_addresses
+        create_authentication_wallet
         recommend_models
         miner_setup_choice
         prompt_config
