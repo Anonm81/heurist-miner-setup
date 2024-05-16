@@ -8,11 +8,13 @@ WD=$(pwd)
 evm_addresses=""
 evm_address=""
 
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'  # Red Color
-NC='\033[0m' # No Color
+# Set up color variables using tput
+GREEN=$(tput setaf 2)
+BLUE=$(tput setaf 4)
+YELLOW=$(tput setaf 3)
+RED=$(tput setaf 1)
+NC=$(tput sgr0) # No Color
+
 
 # Define box drawing characters
 HORIZONTAL_LINE="─"
@@ -629,7 +631,10 @@ clone_repository() {
      echo "${GREEN}\n✓ Miner-Release Repository Cloned → Creating .env File for storing Miner ID's \n${NC}"
 
 #echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
-touch miner-release/.env
+# Check if the file 'miner-release/.env' exists
+if [ ! -f miner-release/.env ]; then
+    # File doesn't exist, create it
+    touch miner-release/.env
 
 if [ "$num_gpus" -gt 1 ]; then
     case "$evm_addresses" in
@@ -664,6 +669,11 @@ while IFS='=' read -r key value; do
     esac
 done < "miner-release/.env"
 echo "${GREEN}\n✓ .env file updated → Proceeding to check for Key files \n${NC}"
+
+else
+    # File exists, skip creation
+    printf "${GREEN}.env' already exists, Proceeding to check for Key files.\n${NC}"
+fi
 }
 
 prompt_config() {
