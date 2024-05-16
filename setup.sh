@@ -14,7 +14,6 @@ YELLOW='\033[0;33m'
 RED='\033[0;31m'  # Red Color
 NC='\033[0m' # No Color
 
-
 # Define box drawing characters
 HORIZONTAL_LINE="─"
 VERTICAL_LINE="│"
@@ -629,17 +628,8 @@ clone_repository() {
      [ ! -d "miner-release" ] && git clone https://github.com/heurist-network/miner-release > /dev/null 2>&1
      echo "${GREEN}\n✓ Miner-Release Repository Cloned → Creating .env File for storing Miner ID's \n${NC}"
 
-
-if [ "$restart_choice" = "2" ]; then
-rm -rf miner-release/.env 
-fi 
-
-
-# Check if the file 'miner-release/.env' exists
-if [ ! -f miner-release/.env ]; then
-    # File doesn't exist, create it
-    touch miner-release/.env
-    echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
+#echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
+touch miner-release/.env
 
 if [ "$num_gpus" -gt 1 ]; then
     case "$evm_addresses" in
@@ -674,11 +664,6 @@ while IFS='=' read -r key value; do
     esac
 done < "miner-release/.env"
 echo "${GREEN}\n✓ .env file updated → Proceeding to check for Key files \n${NC}"
-
-else
-    # File exists, skip creation
-    printf "${GREEN}.env' already exists, Proceeding to check for Key files.\n${NC}"
-fi
 }
 
 prompt_config() {
@@ -778,7 +763,7 @@ echo "${GREEN}\n✓ Conda Environment Activated → Navigating to miner-release\
 
 
 cd miner-release/
-echo "${GREEN}\n✓ Directory Changed to Miner-Release\n${NC}"
+echo "${GREEN}\n✓ Directory Changed to Miner-Release → Creating .env File\n${NC}"
 
 
 #Find location of config.toml
@@ -792,7 +777,6 @@ SD_MINER="$(basename $(find . -type f -name 'sd-miner*.py'  -print -quit 2>/dev/
 
 #Updating SD miner commands
 update_sd_miner_cmd 
-
 
 #echo "${GREEN}\n✓ .env File Updated with EVM_Address → Installing Requirements\n${NC}"
 
@@ -1106,6 +1090,7 @@ if [ -f "$CHOICES_FILE_PATH" ]; then
         else
             echo "${GREEN}miner_monitor does not exist,skipping TMUX termination${NC}"
         fi
+        rm -rf miner-release/.env 
         main 
     elif [ "$restart_choice" = "3" ]; then
         echo "\n${GREEN}Deleting Cache, Proceeding to Reconfigure...${NC}"
