@@ -8,12 +8,11 @@ WD=$(pwd)
 evm_addresses=""
 evm_address=""
 
-# Set up color variables using tput
-GREEN=$(tput setaf 2)
-BLUE=$(tput setaf 4)
-YELLOW=$(tput setaf 3)
-RED=$(tput setaf 1)
-NC=$(tput sgr0) # No Color
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'  # Red Color
+NC='\033[0m' # No Color
 
 
 # Define box drawing characters
