@@ -630,11 +630,17 @@ clone_repository() {
      [ ! -d "miner-release" ] && git clone https://github.com/heurist-network/miner-release > /dev/null 2>&1
      echo "${GREEN}\n✓ Miner-Release Repository Cloned → Creating .env File for storing Miner ID's \n${NC}"
 
-#echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
+
+if [ "$restart_choice" = "2" ]; then
+rm -rf miner-release/.env 
+fi 
+
+
 # Check if the file 'miner-release/.env' exists
 if [ ! -f miner-release/.env ]; then
     # File doesn't exist, create it
     touch miner-release/.env
+    echo "${GREEN}Created .env file → Opening .env File for Editing\n${NC}"
 
 if [ "$num_gpus" -gt 1 ]; then
     case "$evm_addresses" in
@@ -773,7 +779,7 @@ echo "${GREEN}\n✓ Conda Environment Activated → Navigating to miner-release\
 
 
 cd miner-release/
-echo "${GREEN}\n✓ Directory Changed to Miner-Release → Creating .env File\n${NC}"
+echo "${GREEN}\n✓ Directory Changed to Miner-Release\n${NC}"
 
 
 #Find location of config.toml
@@ -788,11 +794,8 @@ SD_MINER="$(basename $(find . -type f -name 'sd-miner*.py'  -print -quit 2>/dev/
 #Updating SD miner commands
 update_sd_miner_cmd 
 
-if [ "$restart_choice" = "2" ]; then
-rm -rf .env 
-fi 
 
-echo "${GREEN}\n✓ .env File Updated with EVM_Address → Installing Requirements\n${NC}"
+#echo "${GREEN}\n✓ .env File Updated with EVM_Address → Installing Requirements\n${NC}"
 
 yes | pip install -r requirements.txt
 echo "${GREEN}\n✓ Requirements Installed\n${NC}"
