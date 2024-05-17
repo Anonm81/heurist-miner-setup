@@ -78,7 +78,7 @@ def aggregate_metrics(df):
     Returns:
         pd.DataFrame: Aggregated metrics.
     """
-    hourly_data = df.set_index('timestamp').resample('H').agg({
+    hourly_data = df.set_index('timestamp').resample('h').agg({
         'tokens': 'sum',
         'time': ['mean', 'count'],
         'http_errors': 'sum',
