@@ -6,6 +6,10 @@ try:
     import re
     import pandas as pd
     import matplotlib.pyplot as plt
+except ImportError:
+    packages = ['pandas', 'matplotlib']
+    for package in packages:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', package])
     import re
     import pandas as pd
     import matplotlib.pyplot as plt
