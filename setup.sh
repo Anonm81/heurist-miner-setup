@@ -966,7 +966,7 @@ run_miners() {
         fi
     fi
 
-log_analysis_scripts &
+log_analysis_scripts > ../logs/bg_script_init_output.log 2>&1 &
 
 tmux attach-session -t miner_monitor
 }
@@ -1102,7 +1102,7 @@ log_analysis_scripts() {
                     else
                         # Wait for some time before checking again
                         echo "${GREEN} Waiting for SD miner to start to initiate SD miner background checker${NC}"
-                        sleep 60
+                        sleep 1200
                     fi
                 done
             else
