@@ -2,7 +2,7 @@ import subprocess
 from datetime import datetime, timedelta
 import os
 import re
-import sys 
+import sys
 
 # Install package for prettytable
 def install_package(package):
@@ -16,20 +16,19 @@ def install_package(package):
     except Exception as e:
         print(f"Unexpected error during package installation: {str(e)}")
 
-
 # Call install_package function to ensure 'prettytable' is installed before importing it.
 install_package("prettytable")
 
 from prettytable import PrettyTable
 
-#Get IP Address
+# Get IP Address
 try:
     public_ip = subprocess.check_output("curl -s ipinfo.io/ip", shell=True).decode().strip()
 except subprocess.CalledProcessError:
     public_ip = "Unknown"
 
-def find_miner_release_folder():
-    for root, dirs, files in os.walk('/'):
+def find_miner_release_folder(base_dir):
+    for root, dirs, files in os.walk(base_dir):
         if 'miner-release' in dirs:
             return os.path.join(root, 'miner-release')
     return None
@@ -152,7 +151,6 @@ def calculate_sd_metrics(log_file, model_type, gpu_id):
         time_since_last_request = "-"
 
     return [
-        
         f"{GPU_MODEL} ({gpu_id})",
         f"{hours_active:.2f}",
         str(total_requests),
@@ -192,9 +190,15 @@ except Exception as e:
     print(f"An error occurred: {e}")
     exit(1)
 
+# Determine the base directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(script_dir) == 'utils':
+    base_dir = os.path.dirname(script_dir)
+else:
+    base_dir = script_dir
 
 # Find the miner-release folder
-miner_release_folder = find_miner_release_folder()
+miner_release_folder = find_miner_release_folder(base_dir)
 if not miner_release_folder:
     print("Error: miner-release folder not found.")
     exit(1)
@@ -208,7 +212,6 @@ miner_ids = re.findall(r'MINER_ID_(\d+)=(\w+)', env_content)
 
 print("Analyzing mining log files...\n")
 
-
 # Process LLM and SD logs separately and create different headers for each
 llm_headers = ["IP Addr","GPU Model", "Hours (n)", "Requests (n)", "Avg Time/Req", "Avg Req %", "Avg Tokens/Req"]
 sd_headers = ["GPU Model", "Hours (n)", "Requests (n)", "Avg Time/Req", "Avg Req %", "Avg Loading Time", "Avg Inference Time", "Requests/Last Hour", "Last Req Processed"]
@@ -220,15 +223,14 @@ for gpu_id, miner_id in miner_ids:
     gpu_uuid = subprocess.check_output(f"nvidia-smi --query-gpu=index,uuid --format=csv,noheader | awk -F', ' -v idx={gpu_id} '$1 == idx {{print substr($2, 5, 6)}}'", shell=True).decode().strip()
 
     llm_log_file = os.path.join(miner_release_folder, f"llm-miner_{miner_id}-{gpu_uuid}.log")
-    llm_metrics = calculate_llm_metrics(llm_log_file, "LLM",gpu_id)
+    llm_metrics = calculate_llm_metrics(llm_log_file, "LLM", gpu_id)
     if llm_metrics:
         llm_metrics_data.append(llm_metrics)
 
     sd_log_file = os.path.join(miner_release_folder, f"sd-miner_{gpu_id}_{miner_id}-{gpu_uuid}.log")
-    sd_metrics = calculate_sd_metrics(sd_log_file, "SD",gpu_id)
+    sd_metrics = calculate_sd_metrics(sd_log_file, "SD", gpu_id)
     if sd_metrics:
         sd_metrics_data.append(sd_metrics)
-
 
 # Only create and print tables if data exists
 if llm_metrics_data:
