@@ -1070,7 +1070,7 @@ log_analysis_scripts() {
     echo "${GREEN}Initiated GPU logger & SD Miner auto restarter in background${NC}"
 
     # Check if $CHOICES_FILE_PATH contains sd-miner*.py
-    if cat ../user_choices.txt | grep -q 'sd-miner.*py'; then
+    if cat ../user_choices.txt | grep -q 'python3 sd-miner.*py'; then
         echo "${GREEN}SD Miner configuration found, waiting for process to start before initiating SD background checker${NC}"
         # Check if SD logs exist
         if ls sd-miner*.log 1> /dev/null 2>&1; then
