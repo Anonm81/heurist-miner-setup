@@ -6,10 +6,6 @@ try:
     import re
     import pandas as pd
     import matplotlib.pyplot as plt
-except ImportError:
-    packages = ['pandas', 'matplotlib']
-    for package in packages:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install','--quiet', package])
     import re
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -104,11 +100,24 @@ def plot_data(df):
     plt.tight_layout()
     plt.show()
 
-# Set file paths
-output_dir = './'  # Adjust if needed
-ensure_directory(output_dir)  # Make sure the directory exists
-log_files = glob.glob('miner-release/sd-miner*.log')  # Adjust the glob pattern to match your log files
-output_csv_path = os.path.join(output_dir, 'log_summary.csv')  # Define output directory and CSV file name
+# Get the directory where the script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Determine the base directory (parent of the script's directory if in utils, otherwise the same)
+if os.path.basename(script_dir) == 'utils':
+    base_dir = os.path.dirname(script_dir)
+else:
+    base_dir = script_dir
+
+# Define the output directory as the 'logs' folder inside the base directory and ensure it exists
+output_dir = os.path.join(base_dir, 'logs')
+ensure_directory(output_dir)
+
+# Adjust the glob pattern to match your log files in the miner-release directory
+log_files = glob.glob(os.path.join(base_dir, 'miner-release', 'sd-miner*.log'))
+
+# Define the output CSV file path
+output_csv_path = os.path.join(output_dir, 'log_summary.csv')
 
 # Execute analysis and plotting
 if log_files:
@@ -117,9 +126,8 @@ if log_files:
 else:
     print("No log files found.")
 
-
-subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet','csvkit'])
-
+# Install csvkit package
+#subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'csvkit'])
 
 # Display the CSV file using csvlook
 os.system(f"csvlook {output_csv_path}")
