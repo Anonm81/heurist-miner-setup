@@ -1,102 +1,87 @@
-import pandas as pd
-from datetime import datetime
-import matplotlib.pyplot as plt
-import subprocess
+import re
+from collections import defaultdict
+from tabulate import tabulate
+import os
 
-# Function to process the log data and generate metrics
-def process_log_file(log_file, output_csv, log_output):
-    # Load the log data
-    df = pd.read_csv(log_file, header=None, names=['Timestamp', 'GPU ID', 'Total Memory (MiB)', 'Used Memory (MiB)', 'Num PIDs', 'Num SD Miners', 'Num LLM Miners', 'Free Memory (MiB)', 'CPU Usage (%)'])
-    
-    # Convert timestamp to datetime
-    df['Timestamp'] = pd.to_datetime(df['Timestamp'], format='%Y/%m/%d %H:%M:%S.%f')
-    
-    # Ensure all numeric columns are of correct type
-    numeric_columns = ['Total Memory (MiB)', 'Used Memory (MiB)', 'Num PIDs', 'Num SD Miners', 'Num LLM Miners', 'Free Memory (MiB)', 'CPU Usage (%)']
-    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
-    
-    # Set the minute for grouping
-    df['Minute'] = df['Timestamp'].dt.floor('min')
-    
-    # Aggregate data per minute
-    minute_summary = df.groupby('Minute').agg({
-        'GPU ID': 'count',  # Number of GPUs
-        'Total Memory (MiB)': 'sum',
-        'Used Memory (MiB)': 'sum',
-        'Num PIDs': 'sum',
-        'Num SD Miners': 'sum',
-        'Num LLM Miners': 'sum',
-        'Free Memory (MiB)': 'sum',
-        'CPU Usage (%)': 'mean'
-    }).reset_index()
-    
-    # Rename columns
-    minute_summary.columns = ['Minute', 'Num GPUs', 'Total Mem', 'Used Mem', 'Num PIDs', 'Num SD', 'Num LLM', 'Free Mem', 'CPU Usage']
-    
-    # Set the hour for grouping
-    minute_summary['Hour'] = minute_summary['Minute'].dt.floor('h')
-    
-    # Aggregate data per hour
-    hourly_summary = minute_summary.groupby('Hour').agg({
-        'Num GPUs': 'max',
-        'Total Mem': 'max',
-        'Used Mem': 'mean',
-        'Num PIDs': 'max',
-        'Num SD': 'max',
-        'Num LLM': 'max',
-        'Free Mem': 'mean',
-        'CPU Usage': 'mean'
-    }).reset_index()
-    
-    # Format the 'Hour' column to just date hour
-    hourly_summary['Hour'] = hourly_summary['Hour'].dt.strftime('%Y-%m-%d %H')
-    
-    # Rename columns for better readability
-    hourly_summary.columns = ['Date Hour', 'Num GPUs', 'Total Mem', 'Avg Used Mem', 'Num GPU PIDs', 'Num SD PIDS', 'Num LLM PIDS', 'Avg Free Mem', 'Avg CPU']
-    
-    # Save to CSV
-    hourly_summary.to_csv(output_csv, index=False)
-    
-    # Write to log file
-    with open(log_output, 'w') as f:
-        f.write(hourly_summary.to_string(index=False))
-    
-    # Print that logs have been written
-    print(f"Metrics written to {output_csv} and {log_output}")
+# Function to parse the log file and aggregate data
+def parse_log_file(log_file):
+    gpu_data = defaultdict(lambda: defaultdict(list))
 
-    return hourly_summary
+    with open(log_file, 'r') as f:
+        for line in f:
+            match = re.match(r'^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\.\d{3}), (\d+), (\d+\.\d+), (\d+\.\d+), (\d+), (\d+), (\d+), (\d+\.\d+),?', line.strip())
+            if match:
+                timestamp, gpu_id, mem_total, mem_used, num_pids, num_sd_pids, num_llm_pids, mem_free = match.groups()
+                date_hour = timestamp[:13].replace('/', '-')  # extract date and hour, replace / with -
+                gpu_data[date_hour][int(gpu_id)].append({
+                    'mem_total': float(mem_total),
+                    'mem_used': float(mem_used),
+                    'num_pids': int(num_pids),
+                    'num_sd_pids': int(num_sd_pids),
+                    'num_llm_pids': int(num_llm_pids),
+                    'mem_free': float(mem_free)
+                })
+    return gpu_data
 
-# Function to plot the GPU usage data
-def plot_gpu_usage(df):
-    fig, ax = plt.subplots(figsize=(12, 8))
+# Function to calculate metrics and generate the table
+def generate_table(gpu_data):
+    table_data = []
 
-    ax.plot(df['Date Hour'], df['Total Mem'], label='Total Mem')
-    ax.plot(df['Date Hour'], df['Avg Used Mem'], label='Avg Used Mem')
-    ax.plot(df['Date Hour'], df['Avg Free Mem'], label='Avg Free Mem')
+    for date_hour, gpus in sorted(gpu_data.items()):
+        hour_data = []
+        for gpu_id, data in sorted(gpus.items()):
+            mem_total = data[0]['mem_total']  # assume mem_total is constant per GPU
+            avg_mem_used = int(sum(d['mem_used'] for d in data) / len(data))
+            num_pids = data[0]['num_pids']  # assume num_pids is constant per GPU per hour
+            num_sd_pids = data[0]['num_sd_pids']
+            num_llm_pids = data[0]['num_llm_pids']
+            avg_mem_free = int(sum(d['mem_free'] for d in data) / len(data))
+            min_low_mem = sum(1 for d in data if d['mem_free'] < mem_total * 0.1)
 
-    ax.set_xlabel('Date Hour')
-    ax.set_ylabel('Memory (MiB)')
-    ax.set_title('GPU Memory Usage')
-    ax.legend()
-    plt.xticks(rotation=45)
-    plt.tight_layout()
+            hour_data.append([
+                date_hour.ljust(13), 
+                str(gpu_id).center(3), 
+                f"{mem_total:.1f}".rjust(8), 
+                str(avg_mem_used).rjust(13), 
+                str(num_pids).center(9),
+                str(num_sd_pids).center(9), 
+                str(num_llm_pids).center(9), 
+                str(avg_mem_free).rjust(13), 
+                str(min_low_mem).center(20)
+            ])
 
-    plt.savefig('gpu_usage_metrics.png')
-    plt.show()
+        if table_data:
+            table_data.append(['-' * 13] + ['-' * 3] + ['-' * 8] + ['-' * 13] + ['-' * 9] + ['-' * 9] + ['-' * 9] + ['-' * 13] + ['-' * 20])  # add horizontal separator
+        table_data.extend(hour_data)
 
-# Function to display CSV using csvlook
-def display_csv_with_csvlook(output_csv):
-    try:
-        result = subprocess.run(['csvlook', output_csv], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-        print(result.stdout)
-    except subprocess.CalledProcessError as e:
-        print(f"Error using csvlook: {e}")
+    return table_data
 
-# Main function to process and visualize data
-def main(log_file='gpu_usage.log', output_csv='hourly_metrics.csv', log_output='processed_log.txt'):
-    df = process_log_file(log_file, output_csv, log_output)
-    plot_gpu_usage(df)
-    display_csv_with_csvlook(output_csv)
+# Main function to parse log, generate table, and print it
+def main():
+    # Determine base directory based on script location
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(script_dir) == 'utils':
+        base_dir = os.path.dirname(script_dir)
+    else:
+        base_dir = script_dir
+
+    # Define the log file directory
+    log_file_dir = os.path.join(base_dir, 'logs')
+    os.makedirs(log_file_dir, exist_ok=True)
+
+    # Define the log file path
+    log_file = os.path.join(log_file_dir, 'gpu_usage.log')
+
+    gpu_data = parse_log_file(log_file)
+    table_data = generate_table(gpu_data)
+    
+    headers = [
+        'Date Hour'.ljust(13), 'GPU'.center(3), 'Total Mem'.center(8), 'Avg Used Mem'.center(13), 
+        'Num PIDs'.center(9), 'SD PIDs'.center(9), 'LLM PIDs'.center(9), 'Avg Free Mem'.center(13), 
+        'Min <10% Free'.center(20)
+    ]
+    
+    print(tabulate(table_data, headers=headers, tablefmt='psql', stralign="center", numalign="right"))
 
 if __name__ == "__main__":
     main()
