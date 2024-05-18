@@ -111,8 +111,18 @@ def display_table(df, model_id):
     table = "\n".join([header, table_lines[0], table_lines[1]] + table_lines[2:])
     print(table)
 
+# Determine the base directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(script_dir) == 'utils':
+    base_dir = os.path.dirname(script_dir)
+else:
+    base_dir = script_dir
+
+# Define the log files directory
+log_files_dir = os.path.join(base_dir, 'miner-release')
+
 # Find all log files in the directory
-log_files = glob.glob('miner-release/llm-miner*.log')
+log_files = glob.glob(os.path.join(log_files_dir, 'llm-miner*.log'))
 
 if not log_files:
     print(colored("No log files found in the 'miner-release' directory.", 'red'))
