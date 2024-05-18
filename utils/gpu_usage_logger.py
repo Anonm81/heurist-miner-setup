@@ -74,7 +74,7 @@ def log_gpu_usage(log_file):
         print(f"Error querying GPU usage: {e}")
 
 # Main function to run the logging at regular intervals
-def main(log_file='gpu_usage.log', interval=60):
+def main(log_file='../logs/gpu_usage.log', interval=60):
     while True:
         log_gpu_usage(log_file)
         time.sleep(interval)
