@@ -1,12 +1,12 @@
 #!/bin/bash
-log_folder="miner-release"
+log_folder="../miner-release"
 setup_script="setup.sh"
 cooldown_minutes=5
 term_width=$(tput cols)
 term_height=$(tput lines)
-restart_log_file="./restart_log.csv"  # Define the path to the log file for restart records
-debug_log_file="./debug_log.txt"      # Define the path for detailed debug logs
-setup_log_file="./setup_log.txt"
+restart_log_file="../logs/restart_log.csv"  # Define the path to the log file for restart records
+debug_log_file="../logs/debug_log.txt"      # Define the path for detailed debug logs
+setup_log_file="../logs/setup_log.txt"
 
 # Ensure the log files exist and if not, create them with headers
 if [ ! -f "$restart_log_file" ]; then
