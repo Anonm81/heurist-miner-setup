@@ -1,5 +1,6 @@
 import subprocess
 import time
+import os
 from datetime import datetime
 
 # Function to query GPU usage and log it
@@ -75,6 +76,11 @@ def log_gpu_usage(log_file):
 
 # Main function to run the logging at regular intervals
 def main(log_file='../logs/gpu_usage.log', interval=60):
+    # Ensure the directory for the log file exists
+    log_dir = os.path.dirname(log_file)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
     while True:
         log_gpu_usage(log_file)
         time.sleep(interval)
