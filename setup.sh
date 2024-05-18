@@ -8,11 +8,17 @@ WD=$(pwd)
 evm_addresses=""
 evm_address=""
 
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'  # Red Color
-NC='\033[0m' # No Color
+#GREEN='\033[0;32m'
+#BLUE='\033[0;34m'
+#YELLOW='\033[0;33m'
+#RED='\033[0;31m'  # Red Color
+#NC='\033[0m' # No Color
+
+RED=$(tput setaf 1)
+GREEN=$(tput setaf 2)
+YELLOW=$(tput setaf 3)
+BLUE=$(tput setaf 4)
+NC=$(tput sgr0)
 
 # Define box drawing characters
 HORIZONTAL_LINE="─"
@@ -729,50 +735,71 @@ esac
 
 }
 
+# Function to check if a Conda environment exists
+conda_env_exists() {
+    conda env list | grep -q "$1"
+}
+
+# Function to check if a Python package is installed in a specific Conda environment
+pip_package_exists() {
+    conda run -n "$1" pip show "$2" >/dev/null 2>&1
+}
+
 install_stable_diffusion_packages() {
-echo "${GREEN}\n✓Installing packages required for Stable Diffusion\n${NC}"
- apt update &&  apt upgrade -y
- if ! command -v nano > /dev/null 2>&1; then
-    apt install nano
-fi
- if ! command -v tmux > /dev/null 2>&1; then
- apt install tmux -y
-fi 
-if ! command -v curl > /dev/null 2>&1; then
-apt install curl -y
-fi 
+    echo "${GREEN}\n✓ Installing packages required for Stable Diffusion\n${NC}"
 
- #apt-get install python3.8-venv
-python3 --version | awk -F'[ .]' '{if ($2 < 3 || ($2 == 3 && $3 < 9)) system("apt-get install -y python3.8-venv")}'
+    # Update and upgrade packages
+    apt update -qq && apt upgrade -y -qq
 
-if ! command -v wget > /dev/null 2>&1; then
-apt install wget
-fi 
+    installed_packages=""
+    # Install necessary packages if they are not installed
+    for pkg in nano tmux curl wget jq bc; do
+        if ! command -v "$pkg" >/dev/null 2>&1; then
+            apt install -y "$pkg"
+            installed_packages="$installed_packages $pkg"
+        fi
+    done
 
-echo "${GREEN}✓ Packages Updated → Creating New Conda Environment${NC}"
+    if [ -n "$installed_packages" ]; then
+        echo "${GREEN}✓ Installed Packages -$installed_packages${NC}"
+    else
+        echo "${GREEN}✓ All necessary packages are already installed.${NC}"
+    fi
 
-conda create --name gpu-3-11 python=3.11 -y
-echo "${GREEN}\n✓ New Conda Environment Created → Initializing Conda\n${NC}"
+    # Check and install python3.8-venv if the Python version is less than 3.9
+    python3 --version | awk -F'[ .]' '{if ($2 < 3 || ($2 == 3 && $3 < 9)) system("apt-get install -y python3.8-venv")}'
 
-eval "$(conda shell.posix hook)"
-echo "${GREEN}\n✓ Conda Initialized → Activating Conda Environment\n${NC}"
+    # Check if the Conda environment exists, create it if it doesn't
+    if ! conda_env_exists "gpu-3-11"; then
+        echo "${GREEN}✓ Conda environment 'gpu-3-11' does not exist. Creating new environment...${NC}"
+        conda create --name gpu-3-11 python=3.11 -y
+    else
+        echo "${GREEN}✓ Conda environment 'gpu-3-11' already exists. Skipping creation...${NC}"
+    fi
 
+    echo "${GREEN}\n✓ Initializing Conda\n${NC}"
+    eval "$(conda shell.posix hook)"
+    echo "${GREEN}\n✓ Conda Initialized → Activating Conda Environment\n${NC}"
 
-conda activate /opt/conda/envs/gpu-3-11
-echo "${GREEN}\n✓ Conda Environment Activated → Navigating to miner-release\n${NC}"
+    # Activate the Conda environment
+    conda activate gpu-3-11
+    echo "${GREEN}\n✓ Conda Environment Activated → Navigating to miner-release\n${NC}"
 
+    # Navigate to the miner-release directory
+    cd miner-release/ || exit 1
+    echo "${GREEN}\n✓ Directory Changed to Miner-Release → Checking and Installing python-dotenv\n${NC}"
 
-cd miner-release/
-echo "${GREEN}\n✓ Directory Changed to Miner-Release → Creating .env File\n${NC}"
-
-
-#Find location of config.toml
-CONFIG_FILE=$(find . -type f -name "config.toml"  -print -quit 2>/dev/null)
-
-pip install python-dotenv
+    # Install python-dotenv only if it is not installed
+    if ! pip_package_exists "gpu-3-11" "python-dotenv"; then
+        echo "${GREEN}✓ python-dotenv not found. Installing...${NC}"
+        pip install python-dotenv
+    else
+        echo "${GREEN}✓ python-dotenv already installed. Skipping installation...${NC}"
+    fi
    
 #Find .py file for exectuting SD Miner
 SD_MINER="$(basename $(find . -type f -name 'sd-miner*.py'  -print -quit 2>/dev/null))"
+CONFIG_FILE=$(find . -type f -name "config.toml"  -print -quit 2>/dev/null)
 
 
 #Updating SD miner commands
@@ -793,22 +820,17 @@ echo "${GREEN}\nUpdated num_child_process and concurrency_soft_limit in .env fil
 
 install_llm_packages() {
 echo "${GREEN}\nInstalling Packages required for LLM Miner\n${NC}"
- apt update -y &&  apt install -y jq
-echo "${GREEN}\n✓ jq Installed → Installing bc\n${NC}"
- apt install -y bc
+# apt update -y &&  apt install -y jq
+#echo "${GREEN}\n✓ jq Installed → Installing bc\n${NC}"
+# apt install -y bc
 
-echo "${GREEN}\n✓ bc Installed → Updating Packages\n${NC}"
+#echo "${GREEN}\n✓ bc Installed → Updating Packages\n${NC}"
 
- apt update -y &&  apt upgrade -y &&  apt install -y software-properties-common &&  add-apt-repository ppa:deadsnakes/ppa << EOF
+ apt install -y software-properties-common -qq &&  add-apt-repository ppa:deadsnakes/ppa << EOF
 
 EOF
- apt install -y python3-venv
+ apt install -y python3-venv -qq
 echo "${GREEN}\n✓ Dependencies Installed for LLM Miner\n${NC}"
-
-#Remove logs for restartability 
-#rm -rf llm-miner_*log 2>/dev/null
-#rm -rf sd-miner_0_*log 2>/dev/null
-
 
 }
 
@@ -944,6 +966,8 @@ run_miners() {
         fi
     fi
 
+log_analysis_scripts &
+
 tmux attach-session -t miner_monitor
 }
 
@@ -1005,7 +1029,92 @@ if ! grep -q "alias monitor='tmux attach-session -t miner_monitor'" ~/.bashrc; t
 
 fi
 
+if ! grep -q "alias py='python3'" ~/.bashrc; then
+        echo "alias py='python3'" >> ~/.bashrc
+fi
 }
+
+install_python_packages_log_analysis() {
+    # List of required packages
+    packages="psutil torch transformers matplotlib pandas seaborn tabulate csvkit"
+
+    echo "${GREEN}Installing packages required for log analysis${NC}"
+
+    # Function to check if a package is installed
+    is_installed() {
+        pip show "$1" > /dev/null 2>&1
+        return $?
+    }
+
+    # Iterate over the list of packages and install if not present
+    for package in $packages; do
+        if is_installed "$package"; then
+            echo "$package is already installed."
+        else
+            echo "Installing $package..."
+            pip install "$package" -qq
+        fi
+    done
+}
+
+log_analysis_scripts() {
+    # Kill any existing instances of the scripts
+    pkill -f sd_miner_check_restarter.sh
+    pkill -f gpu_usage_logger.py
+
+    echo "${GREEN}Killing GPU logger & SD background restarter if active${NC}"
+    echo "$PWD"
+    
+    # Start the gpu_usage_logger.py script
+    nohup python3 ../utils/gpu_usage_logger.py & # kick off GPU logger log GPU usage
+    echo "${GREEN}Initiated GPU logger & SD Miner auto restarter in background${NC}"
+
+    # Check if $CHOICES_FILE_PATH contains sd-miner*.py
+    if cat ../user_choices.txt | grep -q 'sd-miner.*py'; then
+        echo "${GREEN}SD Miner configuration found, waiting for process to start before initiating SD background checker${NC}"
+        # Check if SD logs exist
+        if ls sd-miner*.log 1> /dev/null 2>&1; then
+            echo "${GREEN}SD Log file found, waiting for SD Miner to start${NC}"
+            while true; do
+                # Check for "Request ID.*completed.*" in any sd-miner*.log files
+                if grep -q "Request ID.*completed.*" sd-miner*.log; then
+                    # Start the sd_miner_check_restarter.sh script
+                    nohup bash ../utils/sd_miner_check_restarter.sh & # kick off SD job checker to restart miners when not processing requests
+                    break
+                else
+                    # Wait for some time before checking again
+                    echo "${GREEN} Waiting for SD miner to start to initiate SD miner background checker${NC}"
+                    sleep 600
+                fi
+            done
+        else
+            # Wait for some time before checking again if no sd-miner*.log files exist
+            echo "${GREEN} No SD logs found, waiting for 60 seconds before rechecking... ${NC}"
+            sleep 60
+            if ls sd-miner*.log 1> /dev/null 2>&1; then
+                while true; do
+                    # Check for "Request ID.*completed.*" in any sd-miner*.log files
+                    if grep -q "Request ID.*completed.*" sd-miner*.log; then
+                        # Start the sd_miner_check_restarter.sh script
+                        nohup bash ../utils/sd_miner_check_restarter.sh & # kick off SD job checker to restart miners when not processing requests
+                        echo "${GREEN} Initiated SD miner background checker${NC}"
+                        break
+                    else
+                        # Wait for some time before checking again
+                        echo "${GREEN} Waiting for SD miner to start to initiate SD miner background checker${NC}"
+                        sleep 60
+                    fi
+                done
+            else
+                echo "${RED} No SD logs found after waiting period. Exiting... ${NC}"
+                return 1
+            fi
+        fi
+    else
+        echo "${YELLOW}SD miner not configured. Skipping SD miner checker.${NC}"
+    fi
+}
+
 
 main(){
         export start_time=$(date +%s)
@@ -1021,6 +1130,7 @@ main(){
         install_llm_packages
         update_tmux_bashrc_conf
         save_user_choices
+        install_python_packages_log_analysis
         run_miners 
 }
 
