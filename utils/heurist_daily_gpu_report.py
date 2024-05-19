@@ -31,7 +31,7 @@ def process_data(df):
     
     numeric_cols = ['total_image_count', 'total_text_count', 'last_24_hours_image_win_rate', 'last_24_hours_text_win_rate']
     df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
-    
+
     # Aggregate data
     grouped = df.groupby('hardware').agg({
         'miner_id': 'count',
@@ -40,8 +40,14 @@ def process_data(df):
         'last_24_hours_image_win_rate': 'mean',
         'last_24_hours_text_win_rate': 'mean'
     }).rename(columns={'miner_id': 'number_of_miners'}).reset_index()
-    
+
+    # Calculate average counts per miner and convert to integer
+    grouped['avg_image_count'] = (grouped['total_image_count'] / grouped['number_of_miners']).fillna(0).astype(int)
+    grouped['avg_text_count'] = (grouped['total_text_count'] / grouped['number_of_miners']).fillna(0).astype(int)
+
     return grouped
+
+
 
 def display_data_as_table(df):
     """Display data in a colorful and formatted table with vertical lines for clarity."""
@@ -54,22 +60,35 @@ def display_data_as_table(df):
 
     # Use PrettyTable to format the output
     table = PrettyTable()
-    table.field_names = [colored(col, 'blue', attrs=['bold']) for col in df_sorted.columns]
+    table.field_names = [
+    colored('GPU Model', 'blue', attrs=['bold']), 
+    colored('Miner count', 'blue', attrs=['bold']), 
+    colored('24hr Img count', 'blue', attrs=['bold']),
+    colored('24hr Text count', 'blue', attrs=['bold']),
+    colored('Avg Img count', 'blue', attrs=['bold']),
+    colored('Avg Text count', 'blue', attrs=['bold']),
+    colored('Img Win Rate', 'blue', attrs=['bold']),
+    colored('Text Win Rate', 'blue', attrs=['bold'])
+    ]
     table.align = "l"
 
     for _, row in df_sorted.iterrows():
-        # Only apply color to win rate values
         colored_row = [
             str(row['hardware']),
             str(row['number_of_miners']),
             f"{row['total_image_count']:,}",
             f"{row['total_text_count']:,}",
+            str(row['avg_image_count']),  # Display as string without formatting
+            str(row['avg_text_count']),  # Display as string without formatting
             colored(f"{row['last_24_hours_image_win_rate']:.2f}", 'green' if row['last_24_hours_image_win_rate'] > 0.5 else 'red'),
             colored(f"{row['last_24_hours_text_win_rate']:.2f}" if pd.notna(row['last_24_hours_text_win_rate']) else 'nan', 'green' if pd.notna(row['last_24_hours_text_win_rate']) and row['last_24_hours_text_win_rate'] > 0.5 else 'red')
         ]
         table.add_row(colored_row)
     print(f"\nExtracting data from {api_url} to show GPU Stats for the last 24 hours:\n")
     print(table)
+
+
+
 
 def main():
     
