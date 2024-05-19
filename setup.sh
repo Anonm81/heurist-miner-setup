@@ -1036,10 +1036,10 @@ fi
 
 install_python_packages_log_analysis() {
     # List of required packages
-    packages="psutil torch transformers matplotlib pandas seaborn tabulate csvkit"
+    packages="psutil torch transformers matplotlib pandas seaborn tabulate csvkit termcolor"
 
     echo "${GREEN}Installing packages required for log analysis${NC}"
-
+    conda deactivate 
     # Function to check if a package is installed
     is_installed() {
         pip show "$1" > /dev/null 2>&1
@@ -1055,6 +1055,7 @@ install_python_packages_log_analysis() {
             pip install "$package" -qq
         fi
     done
+    conda activate /opt/conda/envs/gpu-3-11
 }
 
 log_analysis_scripts() {
