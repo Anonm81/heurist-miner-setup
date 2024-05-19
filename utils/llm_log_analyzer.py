@@ -108,7 +108,7 @@ log_files_dir = os.path.join(base_dir, 'miner-release')
 log_files = glob.glob(os.path.join(log_files_dir, 'llm-miner*.log'))
 
 if not log_files:
-    print(colored("No log files found in the 'miner-release' directory.", 'red'))
+    print(colored("No LLM log files found in the 'miner-release' directory.", 'red'))
 else:
     # Extract unique miner IDs
     miner_ids = set()
