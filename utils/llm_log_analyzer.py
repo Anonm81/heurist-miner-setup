@@ -4,6 +4,7 @@ import glob
 import os
 import subprocess
 from termcolor import colored
+from tabulate import tabulate
 
 def parse_log_file(file_path):
     """
@@ -38,12 +39,7 @@ def parse_log_entry(log_entry):
     match = re.match(pattern, log_entry)
     if match:
         entry = match.groupdict()
-        model_match = re.search(r'Model ID: (\S+)', log_entry)
         miner_match = re.search(r'Miner ID: (\S+)', log_entry)
-        if model_match:
-            entry['model_id'] = model_match.group(1)
-        else:
-            entry['model_id'] = 'Unknown'
         if miner_match:
             entry['miner_id'] = miner_match.group(1)
         else:
@@ -83,32 +79,19 @@ def aggregate_metrics(df):
         'time': ['mean', 'count'],
         'http_errors': 'sum',
         'cuda_errors': 'sum',
-        'model_id': lambda x: x.mode()[0] if len(x) > 0 else 'Unknown'
     })
-    hourly_data.columns = ['total_tokens', 'avg_time_per_request', 'num_requests', 'http_errors', 'cuda_errors', 'model_id']
+    hourly_data.columns = ['total_tokens', 'avg_time_per_request', 'num_requests', 'http_errors', 'cuda_errors']
     hourly_data['total_requests'] = hourly_data['num_requests'].cumsum()
     return hourly_data
 
-def display_table(df, model_id):
+def display_table(df):
     """
-    Displays the DataFrame in a table format using csvlook.
+    Displays the DataFrame in a table format using tabulate.
     
     Args:
         df (pd.DataFrame): DataFrame to display.
-        model_id (str): The model ID being used.
     """
-    temp_csv = "temp_hourly_metrics.csv"
-    df.to_csv(temp_csv, index=True)
-    result = subprocess.run(['csvlook', temp_csv], stdout=subprocess.PIPE)
-    os.remove(temp_csv)
-    table = result.stdout.decode('utf-8')
-    
-    header = colored(f"\nLLM Model Running: {model_id}\n", 'cyan', attrs=['bold'])
-    table_lines = table.splitlines()
-    table_lines[0] = colored(table_lines[0], 'blue', attrs=['bold'])  # Column headers
-    table_lines[1] = colored(table_lines[1], 'blue')  # Column header separators
-    table_lines = [colored(line, 'white') for line in table_lines[2:]]  # Table contents
-    table = "\n".join([header, table_lines[0], table_lines[1]] + table_lines[2:])
+    table = tabulate(df, headers='keys', tablefmt='grid')
     print(table)
 
 # Determine the base directory
@@ -129,16 +112,12 @@ if not log_files:
 else:
     # Extract unique miner IDs
     miner_ids = set()
-    model_ids = set()
     for file in log_files:
         with open(file, 'r') as f:
             for line in f:
                 miner_match = re.search(r'Miner ID: (\S+)', line)
                 if miner_match:
                     miner_ids.add(miner_match.group(1))
-                model_match = re.search(r'Model ID: (\S+)', line)
-                if model_match:
-                    model_ids.add(model_match.group(1))
 
     print(colored(f"\nFound {len(log_files)} log files: for LLM Miner: {', '.join(miner_ids)}\n", 'green'))
     print(colored(f"Parsed {len(log_files)} log entries.\n", 'green'))
@@ -158,5 +137,4 @@ else:
         hourly_data = aggregate_metrics(metrics_df)
 
         # Display the aggregated metrics in a table format
-        for model_id in model_ids:
-            display_table(hourly_data, model_id)
+        display_table(hourly_data)
