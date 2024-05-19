@@ -1202,6 +1202,7 @@ if [ -f "$CHOICES_FILE_PATH" ]; then
             echo "${GREEN}miner_monitor does not exist,skipping TMUX termination${NC}"
         fi
         rm -rf miner-release/.env 
+        rm -rf $CHOICES_FILE_PATH
         main 
     elif [ "$restart_choice" = "3" ]; then
         echo "\n${GREEN}Deleting Cache, Proceeding to Reconfigure...${NC}"
