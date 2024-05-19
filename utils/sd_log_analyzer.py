@@ -128,7 +128,7 @@ if log_files:
     df = parse_log_and_analyze(log_files, output_csv_path)
     plot_data(df)
 else:
-    print("No log files found.")
+    print("SD Miner not active.")
 
 # Install csvkit package
 #subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'csvkit'])
