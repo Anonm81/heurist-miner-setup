@@ -79,8 +79,8 @@ def parse_log_and_analyze(log_files, output_csv_path):
     df = pd.DataFrame.from_dict(log_summary, orient='index').reset_index()
     df.columns = ['Date Hour', 'Requests Sent', 'NJ Responses', 'Rate Limit 429 Responses', 'Requests Processed']
     df.to_csv(output_csv_path, index=False)
-    print(f"Data written to: {output_csv_path}")
-
+    #print(f"Data written to: {output_csv_path}")
+    print()
     return df
 
 def plot_data(df):
