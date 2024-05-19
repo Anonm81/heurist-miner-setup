@@ -119,7 +119,7 @@ else:
                 if miner_match:
                     miner_ids.add(miner_match.group(1))
 
-    print(colored(f"\nFound {len(log_files)} log files: for LLM Miner: {', '.join(miner_ids)}\n", 'green'))
+    print(colored(f"\nPrinting additional metrics for LLM Miner\nFound {len(log_files)} log files: for LLM Miner: {', '.join(miner_ids)}\n", 'green'))
     print(colored(f"Parsed {len(log_files)} log entries.\n", 'green'))
 
     # Parse and combine all log files
