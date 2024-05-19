@@ -176,7 +176,7 @@ try:
     
     # Use regex to find the RTX followed by a number with more than three digits
     match = re.search(r'RTX\s(\d{3,})', GPU_MODEL_FULL)
-    if match:
+    if (match):
         # If a match is found, format it as 'RTX {number}'
         GPU_MODEL = f"RTX {match.group(1)}"
     else:
@@ -253,3 +253,7 @@ if sd_metrics_data:
     print(sd_table)
 else:
     print("*SD Miner not active")
+
+# Call the external scripts
+subprocess.run([sys.executable, os.path.join(script_dir, 'llm_log_analyzer.py')])
+subprocess.run([sys.executable, os.path.join(script_dir, 'sd_log_analyzer.py')])
