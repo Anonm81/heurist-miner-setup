@@ -497,7 +497,7 @@ EOF
             esac
             if [ "$manual_miner_choice" = "3" ]; then
                 while true; do
-                    rec_num_sd_miners=$(printf "%.0f" "$((gpu_vram/ 6))")
+                    rec_num_sd_miners=1 #$(printf "%.0f" "$((gpu_vram/ 6))")
                    # echo "\n$rec_num_sd_miners SD Miners"
                     
                     printf "${ITALICS}${GREEN}\\nBased on available %d Mib VRAM/GPU you can run upto $rec_num_sd_miners SD miners ( Incl SDXL ) on each GPU. Enter the number of SD miners per GPU (default is 1): ${NC}" "$vram_per_gpu" 
@@ -511,6 +511,7 @@ EOF
                     else
                     break
                     fi
+                    num_sd_miners=1 
                 done
             fi
             
@@ -689,7 +690,7 @@ else
         echo "$rec_llm_miner_cmd on $num_gpus GPU's"
     fi
     if [ "$rec_user_choice" = "3" ]; then
-        rec_num_sd_miners=$(printf "%.0f" "$((gpu_vram/ 6))")
+        rec_num_sd_miners=1 #$(printf "%.0f" "$((gpu_vram/ 6))")
         echo "${GREEN}\nBased on the system resources:Executing $rec_num_sd_miners instances of "
         echo "Stable DIffusion $sd_model on $num_gpus GPU's"
         sleep 5
@@ -943,7 +944,7 @@ run_miners() {
                 tmux send-keys -t miner_monitor.$((last_pane_index)) "$rec_sd_miner_cmd" C-m
             fi
         elif [ "$rec_user_choice" = "3" ]; then
-            rec_num_sd_miners=$(printf "%.0f" "$((gpu_vram/ 6))")
+            rec_num_sd_miners=1 #$(printf "%.0f" "$((gpu_vram/ 6))")
             for i in $(seq 1 $((rec_num_sd_miners))); do
             if [ "$i" -eq 1 ]; then
                 tmux send-keys -t miner_monitor "$CONDA_ACTIVATE" C-m
